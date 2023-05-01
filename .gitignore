@@ -1,0 +1,5 @@
+glfw
+.vscode
+TIPE
+*.o
+glad.c
