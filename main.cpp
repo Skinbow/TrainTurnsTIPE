@@ -4,12 +4,15 @@
 #include <random>
 #include <time.h>
 #include <utility>
+#include <fstream>
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include "Vector3d.hpp"
 
 #define N_POINTS 10
 #define POWER_OF_THREE 59049UL
+
+std::ofstream file;
 
 struct Trajectory {
     std::vector<Vector3d> points;
@@ -49,23 +52,6 @@ struct Train {
     std::vector<std::vector<Vector3d>> getPositionDerivatives() { 
         return positionDerivatives; 
     }
-
-    // // Calcule les derivees successives 
-    // std::vector<std::vector<Vector3d>> getPositionDerivatives() {
-
-    //     positionDerivatives.push_back(std::vector<Vector3d>());
-    //     for (int i = 0; i < trajectory.points.size(); i++) {
-    //         positionDerivatives[0].push_back(trajectory(i));
-    //     }
-
-    //     for (int j = 1; j < 4; j++) {
-    //         positionDerivatives.push_back(std::vector<Vector3d>());
-    //         for (int i = 0; i < iterations - 2 * j; i++) {
-    //             positionDerivatives[j].push_back((positionDerivatives[j - 1][i + 2] - positionDerivatives[j - 1][i]) / (2 * dt));
-    //         }
-    //     }
-    //     return positionDerivatives;
-    // }
 };
 
 void printPoints(const std::vector<Vector3d> &points) {
@@ -83,10 +69,13 @@ void printForPython(const std::vector<Vector3d> &points) {
     std::cout << "[";
     for (double x : X) {
         std::cout << x << ",";
+        file << x << ",";
     }
     std::cout << "]\n[";
+    file << "\n";
     for (double y : Y) {
         std::cout << y << ",";
+        file << y << ",";
     }
     std::cout << "]\n" << std::endl;
 }
@@ -331,7 +320,7 @@ void findBestTrajectoryExact(int nTries) {
     Trajectory traj;
     Trajectory optimalTraj;
     double optimalValue = -INFINITY;
-    Vector3d endpoints[4] = {{-0.05, 0.0, 0.0}, {0.0, 0.0, 0.0}, {1.0, 1.0, 0.0}, {1.05, 1.0, 0.0}};
+    Vector3d endpoints[4] = {{-0.05, 0, 0.0}, {0.0, 0.0, 0.0}, {1.0, 1.0, 0.0}, {1.05, 1.0, 0.0}};
     
     traj = getStraightTrajectory(endpoints, N_POINTS);
     auto ret = remonterGradientExact(traj, 0.006);
@@ -342,42 +331,35 @@ void findBestTrajectoryExact(int nTries) {
     std::cout << optimalValue << std::endl;
     Train train;
     train.calculateMovement(optimalTraj);
-    printForPython(train.getPositionDerivatives()[2]);
+    //printForPython(train.getPositionDerivatives()[2]);
     printPoints(optimalTraj.points);
     printForPython(optimalTraj.points);
-
-    // Vector3d add = {-0.01, +0.01, 0};
-    // optimalTraj.points[11] = optimalTraj.points[11] + add;
-    // train.calculateMovement(optimalTraj);
-    // auto d = train.getPositionDerivatives();
-    // std::cout << valueFunction(d) << std::endl;
-    // printForPython(d[0]);
-    // printForPython(d[2]);
+    
     return;
 }
 
-void findBestTrajectory(int nTries) {
-    Trajectory traj;
-    Trajectory optimalTraj;
-    double optimalValue = -INFINITY;
-    Vector3d endpoints[4] = {{-0.05, 0.0, 0.0}, {0.0, 0.0, 0.0}, {1.0, 1.0, 0.0}, {1.05, 1.0, 0.0}};
-    for (int i = 0; i < nTries; i++) {
-        std::cout << "Try number " << (i+1) << std::endl;
-        traj = getStraightTrajectory(endpoints, 100);
-        auto ret = remonterGradient(traj, 0.0000001);
-        if (optimalValue < ret.second) {
-            optimalTraj = ret.first;
-            optimalValue = ret.second;
-        }
-    }
-    std::cout << optimalValue << std::endl;
-    Train train;
-    train.calculateMovement(optimalTraj);
-    printForPython(train.getPositionDerivatives()[2]);
-    printPoints(optimalTraj.points);
-    printForPython(optimalTraj.points);
-    return;
-}
+// void findBestTrajectory(int nTries) {
+//     Trajectory traj;
+//     Trajectory optimalTraj;
+//     double optimalValue = -INFINITY;
+//     Vector3d endpoints[4] = {{-0.05, 0.0, 0.0}, {0.0, 0.0, 0.0}, {1.0, 1.0, 0.0}, {1.05, 1.0, 0.0}};
+//     for (int i = 0; i < nTries; i++) {
+//         std::cout << "Try number " << (i+1) << std::endl;
+//         traj = getStraightTrajectory(endpoints, 100);
+//         auto ret = remonterGradient(traj, 0.0000001);
+//         if (optimalValue < ret.second) {
+//             optimalTraj = ret.first;
+//             optimalValue = ret.second;
+//         }
+//     }
+//     std::cout << optimalValue << std::endl;
+//     Train train;
+//     train.calculateMovement(optimalTraj);
+//     printForPython(train.getPositionDerivatives()[2]);
+//     printPoints(optimalTraj.points);
+//     printForPython(optimalTraj.points);
+//     return;
+// }
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height) {
     glViewport(0, 0, width, height);
@@ -398,10 +380,13 @@ int pow3(unsigned n) {
 
 int main() {
     srand(time(NULL));
+    file.open("data.csv");
+
     findBestTrajectoryExact(1);
 
-    
-    // int checked[59050];
+    file.close();
+
+    // int cstd::ofstream filehecked[59050];
     // for (int i = 0; i <= 59049; i++) {
     //     checked[i] = 0;
     // }

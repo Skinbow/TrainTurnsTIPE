@@ -3,3 +3,4 @@ glfw
 TIPE
 *.o
 glad.c
+data.csv
