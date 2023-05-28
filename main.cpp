@@ -88,30 +88,30 @@ typedef unsigned int uint;
 // This function converts an unsigned binary number to reflected binary Gray code.
 void toTernaryGray(unsigned value, unsigned gray[N_POINTS])
 { 
-	unsigned baseN[N_POINTS];	// Stores the ordinary base-N number, one digit per entry
-	unsigned i;		// The loop variable
+    unsigned baseN[N_POINTS];    // Stores the ordinary base-N number, one digit per entry
+    unsigned i;    // The loop variable
  
-	// Put the normal baseN number into the baseN array. For base 10, 109 
-	// would be stored as [9,0,1]
-	for (i = 0; i < N_POINTS; i++) {
-		baseN[i] = value % 3;
-		value    = value / 3;
-	}
+    // Put the normal baseN number into the baseN array. For base 10, 109 
+    // would be stored as [9,0,1]
+    for (i = 0; i < N_POINTS; i++) {
+        baseN[i] = value % 3;
+        value    = value / 3;
+    }
  
-	// Convert the normal baseN number into the Gray code equivalent. Note that
-	// the loop starts at the most significant digit and goes down.
-	unsigned shift = 0;
-	while (i--) {
-		// The Gray digit gets shifted down by the sum of the higher
-		// digits.
-		gray[i] = (baseN[i] + shift) % 3;
-		shift = shift + 3 - gray[i];	// Subtract from base so shift is positive
-	}
+    // Convert the normal baseN number into the Gray code equivalent. Note that
+    // the loop starts at the most significant digit and goes down.
+    unsigned shift = 0;
+    while (i--) {
+        // The Gray digit gets shifted down by the sum of the higher
+        // digits.
+        gray[i] = (baseN[i] + shift) % 3;
+        shift = shift + 3 - gray[i];    // Subtract from base so shift is positive
+    }
 }
 
 std::pair<size_t, int> ternaryGrayDifference(unsigned n)
-{ 
-	unsigned gray1[N_POINTS];
+{
+    unsigned gray1[N_POINTS];
     unsigned gray2[N_POINTS];
 
     toTernaryGray(n, gray1);
@@ -130,32 +130,32 @@ std::pair<size_t, int> ternaryGrayDifference(unsigned n)
 ////
 
 // On utilise une heuristique en choisissant un chemin proche
-Trajectory getNearbyTrajectory(Trajectory traj, double step) {
-    Trajectory newtraj;
-    newtraj.points.push_back(traj.points[0]);
-    newtraj.points.push_back(traj.points[1]);
+// Trajectory getNearbyTrajectory(Trajectory traj, double step) {
+//     Trajectory newtraj;
+//     newtraj.points.push_back(traj.points[0]);
+//     newtraj.points.push_back(traj.points[1]);
 
-    Vector3d dir = (traj.points[traj.points.size() - 2] - traj.points[1]);
-    Vector3d normal = {dir.y, -dir.x, 0.0};
-    normal = normal / normal.norm();
+//     Vector3d dir = (traj.points[traj.points.size() - 2] - traj.points[1]);
+//     Vector3d normal = {dir.y, -dir.x, 0.0};
+//     normal = normal / normal.norm();
 
-    // On laisse fixe les quatre points aux extremites, puisque les bouts sont lineaires
-    for (int i = 2; i < traj.points.size() - 2; i++) {
-        int r = rand();
-        Vector3d add;
-        if ((r & 2) == 0) {
-            add = Vector3d::zero();
-        }
-        else {
-            add = normal * ((double) ((r & 1) * 2 - 1));
-        }
-        newtraj.points.push_back(traj.points[i] + (add * step));
-    }
+//     // On laisse fixe les quatre points aux extremites, puisque les bouts sont lineaires
+//     for (int i = 2; i < traj.points.size() - 2; i++) {
+//         int r = rand();
+//         Vector3d add;
+//         if ((r & 2) == 0) {
+//             add = Vector3d::zero();
+//         }
+//         else {
+//             add = normal * ((double) ((r & 1) * 2 - 1));
+//         }
+//         newtraj.points.push_back(traj.points[i] + (add * step));
+//     }
 
-    newtraj.points.push_back(traj.points[traj.points.size() - 2]);
-    newtraj.points.push_back(traj.points[traj.points.size() - 1]);
-    return newtraj;
-}
+//     newtraj.points.push_back(traj.points[traj.points.size() - 2]);
+//     newtraj.points.push_back(traj.points[traj.points.size() - 1]);
+//     return newtraj;
+// }
 
 // On utilise une heuristique en choisissant un chemin proche
 void getNextTrajectory(Trajectory &traj, uint n, double step) {
@@ -182,13 +182,14 @@ double valueFunction(std::vector<std::vector<Vector3d>> positionDerivatives) {
     // return 1/jerkMax;
 
     double speedMax = 0;
-    for (auto speed : positionDerivatives[2]) {
+    for (auto speed : positionDerivatives[3]) {
         double sn = speed.norm();
         if (sn > speedMax) {
             speedMax = sn;
         }
     }
-    return -speedMax;
+
+    return speedMax;
     // double travelDistance = 0;
     //     for (int j = 0; j < positionDerivatives[0].size() - 1; j++) {
     //         Vector3d dOM = positionDerivatives[0][j + 1] - positionDerivatives[0][j];
@@ -212,58 +213,59 @@ Trajectory getStraightTrajectory(Vector3d endpoints[4], int N) {
 }
 
 // On randomise en suivant la direction generale entre les deux bouts
-Trajectory getRandomTrajectory(Vector3d endpoints[4], int N) {
-    Trajectory traj;
-    traj.points.push_back(endpoints[0]);
-    traj.points.push_back(endpoints[1]);
-    Vector3d dir = (endpoints[2] - endpoints[1]) / N;
-    Vector3d normal = {dir.y, -dir.x, 0.0};
-    normal = normal / (normal.norm());
-    double range = dir.norm() * N / 1000;
-    for (int i = 1; i < N; i++) {
-        double t = 2 * range  * (random() / (double) RAND_MAX) - range;
-        traj.points.push_back(endpoints[1] + (dir * i) + normal * t);
-    }
-    traj.points.push_back(endpoints[2]);
-    traj.points.push_back(endpoints[3]);
-    return traj;
-}
+// Trajectory getRandomTrajectory(Vector3d endpoints[4], int N) {
+//     Trajectory traj;
+//     traj.points.push_back(endpoints[0]);
+//     traj.points.push_back(endpoints[1]);
+//     Vector3d dir = (endpoints[2] - endpoints[1]) / N;
+//     Vector3d normal = {dir.y, -dir.x, 0.0};
+//     normal = normal / (normal.norm());
+//     double range = dir.norm() * N / 1000;
+//     for (int i = 1; i < N; i++) {
+//         double t = 2 * range  * (random() / (double) RAND_MAX) - range;
+//         traj.points.push_back(endpoints[1] + (dir * i) + normal * t);
+//     }
+//     traj.points.push_back(endpoints[2]);
+//     traj.points.push_back(endpoints[3]);
+//     return traj;
+// }
 
-std::pair<Trajectory, double> remonterGradient(Trajectory &traj_0, double tolerance) {
-    Train train;
-    int maxTries = 1000;
-    double step = tolerance * 1000;
-    Trajectory optimalTraj;
-    double optimalValue;
+// std::pair<Trajectory, double> remonterGradient(Trajectory &traj_0, double tolerance) {
+//     Train train;
+//     int maxTries = 1000;
+//     double step = tolerance * 1000;
+//     Trajectory optimalTraj;
+//     double optimalValue;
 
-    train.calculateMovement(traj_0);
-    optimalValue = valueFunction(train.getPositionDerivatives());
-    optimalTraj = traj_0;
+//     train.calculateMovement(traj_0);
+//     optimalValue = valueFunction(train.getPositionDerivatives());
+//     optimalTraj = traj_0;
 
-    Trajectory tempTraj;
-    double tempValue = 0;
-    std::vector<std::vector<Vector3d>> positionDerivatives;
-    while (step > tolerance) {
-        int noRiseTries = 0;
-        while (noRiseTries < maxTries) {
-            tempTraj = getNearbyTrajectory(optimalTraj, step);
-            train.calculateMovement(tempTraj);
-            tempValue = valueFunction(train.getPositionDerivatives());
-            // std::cout << -tempValue << ", " << step << std::endl;
-            if (tempValue > optimalValue) {
-                optimalTraj = tempTraj;
-                optimalValue = tempValue;
-                noRiseTries = 0;
-            }
-            else {
-                noRiseTries += 1;
-            }
-        }
-        step /= 2;
-    }
-    return std::make_pair(optimalTraj, optimalValue);
-}
+//     Trajectory tempTraj;
+//     double tempValue = 0;
+//     std::vector<std::vector<Vector3d>> positionDerivatives;
+//     while (step > tolerance) {
+//         int noRiseTries = 0;
+//         while (noRiseTries < maxTries) {
+//             tempTraj = getNearbyTrajectory(optimalTraj, step);
+//             train.calculateMovement(tempTraj);
+//             tempValue = valueFunction(train.getPositionDerivatives());
+//             // std::cout << -tempValue << ", " << step << std::endl;
+//             if (tempValue > optimalValue) {
+//                 optimalTraj = tempTraj;
+//                 optimalValue = tempValue;
+//                 noRiseTries = 0;
+//             }
+//             else {
+//                 noRiseTries += 1;
+//             }
+//         }
+//         step /= 2;
+//     }
+//     return std::make_pair(optimalTraj, optimalValue);
+// }
 
+// Decale la trajectoire de depart d'une distance step sur le côté pour pouvoir utiliser le codage ternaire de gray
 void slide(Trajectory &traj, double step) {
     Vector3d dir = (traj.points[traj.points.size() - 2] - traj.points[1]);
     Vector3d normal = {dir.y, -dir.x, 0.0};
@@ -289,11 +291,11 @@ std::pair<Trajectory, double> remonterGradientExact(Trajectory &traj_0, double t
     
     std::vector<std::vector<Vector3d>> positionDerivatives;
     while (step > tolerance) {
-        bool noImprovement = false;
-        while (!noImprovement) {
+        bool valueImproved = true;
+        while (valueImproved) {
             tempTraj = optimalTraj;
             slide(tempTraj, step);
-            noImprovement = true;
+            valueImproved = false;
             for (int i = 0; i < POWER_OF_THREE; i++) {
                 //std::cout << tempTraj.points[tempTraj.points.size() - 3] << std::endl;
                 getNextTrajectory(tempTraj, i, step);
@@ -301,15 +303,15 @@ std::pair<Trajectory, double> remonterGradientExact(Trajectory &traj_0, double t
                 tempValue = valueFunction(train.getPositionDerivatives());
                 // std::cout << -tempValue << ", " << step << std::endl;
                 
-                if (tempValue > optimalValue + 0.00001) {
+                if (tempValue < optimalValue - 0.00001) {
                     std::cout << tempValue <<  " " << optimalValue << std::endl;
                     optimalTraj = tempTraj;
                     optimalValue = tempValue;
-                    noImprovement = false;
+                    valueImproved = true;
                     std::cout << step << std::endl;
                 }
             }
-            std::cout << noImprovement << std::endl;
+            std::cout << valueImproved << std::endl;
         }
         step /= 2;
     }
@@ -320,7 +322,7 @@ void findBestTrajectoryExact(int nTries) {
     Trajectory traj;
     Trajectory optimalTraj;
     double optimalValue = -INFINITY;
-    Vector3d endpoints[4] = {{-0.05, 0, 0.0}, {0.0, 0.0, 0.0}, {1.0, 1.0, 0.0}, {1.05, 1.0, 0.0}};
+    Vector3d endpoints[4] = {{-0.05, 0, 0.0}, {0.0, 0.0, 0.0}, {1.0, 1.0, 0.0}, {1.05, 1.05, 0.0}};
     
     traj = getStraightTrajectory(endpoints, N_POINTS);
     auto ret = remonterGradientExact(traj, 0.006);
@@ -328,7 +330,7 @@ void findBestTrajectoryExact(int nTries) {
     optimalTraj = ret.first;
     optimalValue = ret.second;
 
-    std::cout << optimalValue << std::endl;
+    std::cout << "The best value: " << optimalValue << std::endl;
     Train train;
     train.calculateMovement(optimalTraj);
     //printForPython(train.getPositionDerivatives()[2]);
@@ -370,12 +372,96 @@ void processInput(GLFWwindow *window) {
         glfwSetWindowShouldClose(window, true);
 }
 
-int pow3(unsigned n) {
-    unsigned p = 1;
-    for (int i = 0; i < n; i++) {
-        p *= 3;
+// int pow3(unsigned n) {
+//     unsigned p = 1;
+//     for (int i = 0; i < n; i++) {
+//         p *= 3;
+//     }
+//     return p;
+// }
+const float vertices[] = {
+    -0.5f, -0.5f, 0.0f,
+     0.5f, -0.5f, 0.0f,
+     0.0f,  0.5f, -1.0f
+};
+
+const char* vertexShaderSource = "#version 460 core\n"
+        "layout (location = 0) in vec3 aPos;\n"
+        "void main()"
+        "{"
+        "   gl_Position = vec4(aPos.x, aPos.y, aPos.z, 1.0);"
+        "}";
+
+const char* fragmentShaderSource = "#version 460 core\n"
+        "out vec4 FragColor;\n"
+        "void main()"
+        "{"
+        "FragColor = vec4(1.0f, 0.5f, 0.2f, 1.0f);"
+        "}";
+
+unsigned int genShaderProgram() {
+    
+    unsigned int vertexShader;
+    vertexShader = glCreateShader(GL_VERTEX_SHADER);
+
+    glShaderSource(vertexShader, 1, &vertexShaderSource, NULL);
+    glCompileShader(vertexShader);
+
+
+    unsigned int fragmentShader;
+    fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
+    glShaderSource(fragmentShader, 1, &fragmentShaderSource, NULL);
+    glCompileShader(fragmentShader);
+
+    int success;
+    char infoLog[512];
+
+    glGetShaderiv(vertexShader, GL_COMPILE_STATUS, &success);
+    if(!success)
+    {
+    glGetShaderInfoLog(vertexShader, 512, NULL, infoLog);
+    std::cout << "ERROR::SHADER::VERTEX::COMPILATION_FAILED\n" << infoLog << std::endl;
     }
-    return p;
+
+    unsigned int shaderProgram;
+    shaderProgram = glCreateProgram();
+    glAttachShader(shaderProgram, vertexShader);
+    glAttachShader(shaderProgram, fragmentShader);
+    glLinkProgram(shaderProgram);
+
+
+    
+    glGetProgramiv(shaderProgram, GL_LINK_STATUS, &success);
+    if(!success) {
+        glGetProgramInfoLog(shaderProgram, 512, NULL, infoLog);
+        std::cout << infoLog << std::endl;
+    }
+
+    glDeleteShader(vertexShader);
+    glDeleteShader(fragmentShader);
+
+    return shaderProgram;
+}
+
+void draw(unsigned int& VAO, unsigned int& VBO, unsigned int& shaderProgram) {
+    glUseProgram(shaderProgram);
+    glBindVertexArray(VAO);
+    glDrawArrays(GL_LINE_LOOP, 0, 3);
+}
+
+void setup(unsigned int& VAO, unsigned int& VBO, unsigned int& shaderProgram) {
+    shaderProgram = genShaderProgram();
+
+    glGenVertexArrays(1, &VAO);
+    glGenBuffers(1, &VBO);
+
+    glBindVertexArray(VAO);
+
+    glBindBuffer(GL_ARRAY_BUFFER, VBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(0);
 }
 
 int main() {
@@ -386,7 +472,7 @@ int main() {
 
     file.close();
 
-    // int cstd::ofstream filehecked[59050];
+    // int checked[59050];
     // for (int i = 0; i <= 59049; i++) {
     //     checked[i] = 0;
     // }
@@ -419,42 +505,47 @@ int main() {
     // printTrajectory(traj);
     // printTrajectory(newTraj);
 
-    // glfwInit();
-    // glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
-    // glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
-    // glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+    glfwInit();
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
+    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
-    // GLFWwindow* window = glfwCreateWindow(800, 600, "LearnOpenGL", NULL, NULL);
-    // if (window == NULL)
-    // {
-    //     std::cout << "Failed to create GLFW window" << std::endl;
-    //     glfwTerminate();
-    //     return -1;
-    // }
-    // glfwMakeContextCurrent(window);
+    GLFWwindow* window = glfwCreateWindow(800, 600, "LearnOpenGL", NULL, NULL);
+    if (window == NULL)
+    {
+        std::cout << "Failed to create GLFW window" << std::endl;
+        glfwTerminate();
+        return -1;
+    }
+    glfwMakeContextCurrent(window);
 
-    // if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
-    // {
-    //     std::cout << "Failed to initialize GLAD" << std::endl;
-    //     return -1;
-    // }    
+    if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
+    {
+        std::cout << "Failed to initialize GLAD" << std::endl;
+        return -1;
+    }    
 
-    // glViewport(0, 0, 800, 600);
+    glViewport(0, 0, 800, 600);
 
-    // glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
+    glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
 
-    // glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
+    glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
 
-    // while (!glfwWindowShouldClose(window))
-    // {
-    //     processInput(window);
+    while (!glfwWindowShouldClose(window))
+    {
+        processInput(window);
 
-    //     glClear(GL_COLOR_BUFFER_BIT);
+        glClear(GL_COLOR_BUFFER_BIT);
 
-    //     glfwSwapBuffers(window);
-    //     glfwPollEvents();
-    // }
+        unsigned int VAO, VBO, shaderProgram;
 
-    // glfwTerminate();
+        setup(VAO, VBO, shaderProgram);
+        draw(VAO, VBO, shaderProgram);
+
+        glfwSwapBuffers(window);
+        glfwPollEvents();
+    }
+
+    glfwTerminate();
     return 0;
 }
