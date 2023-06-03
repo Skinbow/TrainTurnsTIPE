@@ -1,10 +1,12 @@
 #include <iostream>
+#include <algorithm>
 #include <vector>
 #include <cmath>
 #include <random>
 #include <time.h>
 #include <utility>
 #include <fstream>
+#include <chrono>
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include "Vector3d.hpp"
@@ -28,25 +30,46 @@ struct Train {
 
     Train() : speed(1) {}
     void calculateMovement(const Trajectory &trajectory) {
-        size_t N = trajectory.points.size();
         positionDerivatives.clear();
+        // positionDerivatives.push_back(std::vector<Vector3d>());
+        // positionDerivatives[0].push_back(trajectory.points[0]);
+        // for (int i = 0; i < trajectory.points.size() - 1; i++) {
+        //     positionDerivatives[0].push_back(trajectory.points[i+1] + trajectory.points[i]);
+        //     positionDerivatives[0].push_back(trajectory.points[i + 1]);
+        // }
         positionDerivatives.push_back(trajectory.points);
+
+        size_t N = trajectory.points.size();
 
         std::vector<double> times = {0.0};
 
         double travelDistance = 0;
-        for (int j = 0; j < N - 1; j++) {
+        for (unsigned int j = 0; j < N - 1; j++) {
             Vector3d dOM = positionDerivatives[0][j + 1] - positionDerivatives[0][j];
             travelDistance += dOM.norm();
             times.push_back(travelDistance / speed);
         }
 
-        for (int j = 1; j < 4; j++) {
+        for (unsigned j = 1; j < 4; j++) {
             positionDerivatives.push_back(std::vector<Vector3d>());
-            for (int i = 0; i < N - j; i++) {
+            for (unsigned i = 0; i < N - j; i++) {
                 positionDerivatives[j].push_back((positionDerivatives[j - 1][i + 1] - positionDerivatives[j - 1][i]) / (times[i + 1] - times[i]));
             }
+            //std::cout << positionDerivatives[j - 1].size() << " " << N - j << std::endl;
+            // for (int i = 1; i < N - j; i++) {
+            //     positionDerivatives[j].push_back((positionDerivatives[j - 1][i + 1] - positionDerivatives[j - 1][i - 1]) / (times[i + 1] - times[i - 1]));
+            // }
         }
+
+        
+        positionDerivatives[2].clear();
+        for (unsigned i = 1; i < N - 1; i++) {
+            positionDerivatives[2].push_back((positionDerivatives[0][i + 1] + positionDerivatives[0][i - 1] - positionDerivatives[0][i] * 2) / ((times[i + 1] - times[i - 1]) * (times[i + 1] - times[i - 1])));
+        }
+        // for (unsigned i = 0; i < N - 3; i++) {
+        //     std::cout << positionDerivatives[2][i] << " ";
+        // }
+        // std::cout << std::endl;
     }
 
     std::vector<std::vector<Vector3d>> getPositionDerivatives() { 
@@ -124,51 +147,26 @@ std::pair<size_t, int> ternaryGrayDifference(unsigned n)
         }
     }
     int dir = ((int) gray2[change]) - ((int) gray1[change]);
-    //std::cout << dir << std::endl;
+    // for (int i = 0; i < N_POINTS; i++) {
+    //     std::cout << gray1[i];
+    // }
+    // std::cout << std::endl;
+    
     return std::make_pair(change, dir);
 }
-////
-
-// On utilise une heuristique en choisissant un chemin proche
-// Trajectory getNearbyTrajectory(Trajectory traj, double step) {
-//     Trajectory newtraj;
-//     newtraj.points.push_back(traj.points[0]);
-//     newtraj.points.push_back(traj.points[1]);
-
-//     Vector3d dir = (traj.points[traj.points.size() - 2] - traj.points[1]);
-//     Vector3d normal = {dir.y, -dir.x, 0.0};
-//     normal = normal / normal.norm();
-
-//     // On laisse fixe les quatre points aux extremites, puisque les bouts sont lineaires
-//     for (int i = 2; i < traj.points.size() - 2; i++) {
-//         int r = rand();
-//         Vector3d add;
-//         if ((r & 2) == 0) {
-//             add = Vector3d::zero();
-//         }
-//         else {
-//             add = normal * ((double) ((r & 1) * 2 - 1));
-//         }
-//         newtraj.points.push_back(traj.points[i] + (add * step));
-//     }
-
-//     newtraj.points.push_back(traj.points[traj.points.size() - 2]);
-//     newtraj.points.push_back(traj.points[traj.points.size() - 1]);
-//     return newtraj;
-// }
 
 // On utilise une heuristique en choisissant un chemin proche
 void getNextTrajectory(Trajectory &traj, uint n, double step) {
     auto ch = ternaryGrayDifference(n);
 
-    Vector3d dir = (traj.points[traj.points.size() - 2] - traj.points[1]);
+    Vector3d dir = (traj.points[traj.points.size() - 3] - traj.points[2]);
     Vector3d normal = {dir.y, -dir.x, 0.0};
     normal = normal / normal.norm();
     //std::cout << traj.points.size() << std::endl;
     
     // On se deplace dans la direction orthogonale
     //if (ch.first == 9) std::cout << "Ten! " << n << " " << ch.second << " " << traj.points[2 +ch.first] << std::endl;
-    traj.points[2 + ch.first] = traj.points[2 + ch.first] + normal * step * ch.second;
+    traj.points[3 + ch.first] = traj.points[3 + ch.first] + normal * step * ch.second;
 }
 
 double valueFunction(std::vector<std::vector<Vector3d>> positionDerivatives) {
@@ -181,15 +179,38 @@ double valueFunction(std::vector<std::vector<Vector3d>> positionDerivatives) {
     // }
     // return 1/jerkMax;
 
-    double speedMax = 0;
-    for (auto speed : positionDerivatives[3]) {
-        double sn = speed.norm();
-        if (sn > speedMax) {
-            speedMax = sn;
+    // double speedMax = 0;
+    // for (auto speed : positionDerivatives[2]) {
+    //     double sn = speed.norm();
+    //     if (sn > speedMax) {
+    //         speedMax = sn;
+    //     }
+    // }
+
+    double max = 0;
+    double sum = 0;
+    for (unsigned int i = 0; i < positionDerivatives[2].size(); i++) {
+        auto direction = positionDerivatives[0][i + 1] - positionDerivatives[0][i];
+        auto normal = direction.cross(Vector3d(0,0,1));
+        normal = normal * 1/normal.norm();
+        double sn = positionDerivatives[2][i].dot(normal);
+        sum += sn*sn;
+        if (sn*sn > max) {
+            max = sn*sn;
         }
     }
+    sum = sum / positionDerivatives[2].size();
+    return max + sum;
 
-    return speedMax;
+    // double max = 0;
+    // for (auto speed : positionDerivatives[2]) {
+    //     double sn = speed.norm();
+    //     if (sn*sn > max) {
+    //         max = sn*sn;
+    //     }
+    // }
+
+    return max;
     // double travelDistance = 0;
     //     for (int j = 0; j < positionDerivatives[0].size() - 1; j++) {
     //         Vector3d dOM = positionDerivatives[0][j + 1] - positionDerivatives[0][j];
@@ -198,42 +219,36 @@ double valueFunction(std::vector<std::vector<Vector3d>> positionDerivatives) {
     //     return 1/travelDistance;
 }
 
-Trajectory getStraightTrajectory(Vector3d endpoints[4], int N) {
+Trajectory getStraightTrajectory(Vector3d endpoints[6], int N) {
     Trajectory traj;
     traj.points.push_back(endpoints[0]);
     traj.points.push_back(endpoints[1]);
-    Vector3d dir = (endpoints[2] - endpoints[1]) / (N + 1);
+    traj.points.push_back(endpoints[2]);
+    Vector3d dir = (endpoints[3] - endpoints[2]) / (N + 1);
     for (int i = 1; i < N + 1; i++) {
         traj.points.push_back(endpoints[1] + (dir * i));
     }
-    traj.points.push_back(endpoints[2]);
     traj.points.push_back(endpoints[3]);
-    std::cout << traj.points.size();
+    traj.points.push_back(endpoints[4]);
+    traj.points.push_back(endpoints[5]);
+    //std::cout << traj.points.size();
     return traj;
 }
 
-// On randomise en suivant la direction generale entre les deux bouts
-// Trajectory getRandomTrajectory(Vector3d endpoints[4], int N) {
-//     Trajectory traj;
-//     traj.points.push_back(endpoints[0]);
-//     traj.points.push_back(endpoints[1]);
-//     Vector3d dir = (endpoints[2] - endpoints[1]) / N;
-//     Vector3d normal = {dir.y, -dir.x, 0.0};
-//     normal = normal / (normal.norm());
-//     double range = dir.norm() * N / 1000;
-//     for (int i = 1; i < N; i++) {
-//         double t = 2 * range  * (random() / (double) RAND_MAX) - range;
-//         traj.points.push_back(endpoints[1] + (dir * i) + normal * t);
-//     }
-//     traj.points.push_back(endpoints[2]);
-//     traj.points.push_back(endpoints[3]);
-//     return traj;
-// }
+// Decale la trajectoire de depart d'une distance step sur le côté pour pouvoir utiliser le codage ternaire de gray
+void slide(Trajectory &traj, double step) {
+    Vector3d dir = (traj.points[traj.points.size() - 3] - traj.points[2]);
+    Vector3d normal = {dir.y, -dir.x, 0.0};
+    normal = normal / normal.norm();
 
-// std::pair<Trajectory, double> remonterGradient(Trajectory &traj_0, double tolerance) {
+    for (unsigned int i = 3; i < traj.points.size() - 3; i++) {
+        traj.points[i] = traj.points[i] + normal * (-1) * step;
+    }
+}
+
+// std::pair<Trajectory, double> remonterGradientExact(Trajectory &traj_0, double tolerance) {
 //     Train train;
-//     int maxTries = 1000;
-//     double step = tolerance * 1000;
+//     double step = 0.1;
 //     Trajectory optimalTraj;
 //     double optimalValue;
 
@@ -243,124 +258,34 @@ Trajectory getStraightTrajectory(Vector3d endpoints[4], int N) {
 
 //     Trajectory tempTraj;
 //     double tempValue = 0;
+    
 //     std::vector<std::vector<Vector3d>> positionDerivatives;
 //     while (step > tolerance) {
-//         int noRiseTries = 0;
-//         while (noRiseTries < maxTries) {
-//             tempTraj = getNearbyTrajectory(optimalTraj, step);
-//             train.calculateMovement(tempTraj);
-//             tempValue = valueFunction(train.getPositionDerivatives());
-//             // std::cout << -tempValue << ", " << step << std::endl;
-//             if (tempValue > optimalValue) {
-//                 optimalTraj = tempTraj;
-//                 optimalValue = tempValue;
-//                 noRiseTries = 0;
+//         bool valueImproved = true;
+//         while (valueImproved) {
+//             tempTraj = optimalTraj;
+//             slide(tempTraj, step);
+//             valueImproved = false;
+//             for (int i = 0; i < POWER_OF_THREE; i++) {
+//                 //std::cout << tempTraj.points[tempTraj.points.size() - 3] << std::endl;
+//                 getNextTrajectory(tempTraj, i, step);
+//                 train.calculateMovement(tempTraj);
+//                 tempValue = valueFunction(train.getPositionDerivatives());
+//                 // std::cout << -tempValue << ", " << step << std::endl;
+                
+//                 if (tempValue < optimalValue - 0.00001) {
+//                     std::cout << tempValue <<  " " << optimalValue << std::endl;
+//                     optimalTraj = tempTraj;
+//                     optimalValue = tempValue;
+//                     valueImproved = true;
+//                     std::cout << step << std::endl;
+//                 }
 //             }
-//             else {
-//                 noRiseTries += 1;
-//             }
+//             std::cout << valueImproved << std::endl;
 //         }
 //         step /= 2;
 //     }
 //     return std::make_pair(optimalTraj, optimalValue);
-// }
-
-// Decale la trajectoire de depart d'une distance step sur le côté pour pouvoir utiliser le codage ternaire de gray
-void slide(Trajectory &traj, double step) {
-    Vector3d dir = (traj.points[traj.points.size() - 2] - traj.points[1]);
-    Vector3d normal = {dir.y, -dir.x, 0.0};
-    normal = normal / normal.norm();
-
-    for (int i = 2; i < traj.points.size() - 2; i++) {
-        traj.points[i] = traj.points[i] + normal * (-1) * step;
-    }
-}
-
-std::pair<Trajectory, double> remonterGradientExact(Trajectory &traj_0, double tolerance) {
-    Train train;
-    double step = 0.1;
-    Trajectory optimalTraj;
-    double optimalValue;
-
-    train.calculateMovement(traj_0);
-    optimalValue = valueFunction(train.getPositionDerivatives());
-    optimalTraj = traj_0;
-
-    Trajectory tempTraj;
-    double tempValue = 0;
-    
-    std::vector<std::vector<Vector3d>> positionDerivatives;
-    while (step > tolerance) {
-        bool valueImproved = true;
-        while (valueImproved) {
-            tempTraj = optimalTraj;
-            slide(tempTraj, step);
-            valueImproved = false;
-            for (int i = 0; i < POWER_OF_THREE; i++) {
-                //std::cout << tempTraj.points[tempTraj.points.size() - 3] << std::endl;
-                getNextTrajectory(tempTraj, i, step);
-                train.calculateMovement(tempTraj);
-                tempValue = valueFunction(train.getPositionDerivatives());
-                // std::cout << -tempValue << ", " << step << std::endl;
-                
-                if (tempValue < optimalValue - 0.00001) {
-                    std::cout << tempValue <<  " " << optimalValue << std::endl;
-                    optimalTraj = tempTraj;
-                    optimalValue = tempValue;
-                    valueImproved = true;
-                    std::cout << step << std::endl;
-                }
-            }
-            std::cout << valueImproved << std::endl;
-        }
-        step /= 2;
-    }
-    return std::make_pair(optimalTraj, optimalValue);
-}
-
-void findBestTrajectoryExact(int nTries) {
-    Trajectory traj;
-    Trajectory optimalTraj;
-    double optimalValue = -INFINITY;
-    Vector3d endpoints[4] = {{-0.05, 0, 0.0}, {0.0, 0.0, 0.0}, {1.0, 1.0, 0.0}, {1.05, 1.05, 0.0}};
-    
-    traj = getStraightTrajectory(endpoints, N_POINTS);
-    auto ret = remonterGradientExact(traj, 0.006);
-    
-    optimalTraj = ret.first;
-    optimalValue = ret.second;
-
-    std::cout << "The best value: " << optimalValue << std::endl;
-    Train train;
-    train.calculateMovement(optimalTraj);
-    //printForPython(train.getPositionDerivatives()[2]);
-    printPoints(optimalTraj.points);
-    printForPython(optimalTraj.points);
-    
-    return;
-}
-
-// void findBestTrajectory(int nTries) {
-//     Trajectory traj;
-//     Trajectory optimalTraj;
-//     double optimalValue = -INFINITY;
-//     Vector3d endpoints[4] = {{-0.05, 0.0, 0.0}, {0.0, 0.0, 0.0}, {1.0, 1.0, 0.0}, {1.05, 1.0, 0.0}};
-//     for (int i = 0; i < nTries; i++) {
-//         std::cout << "Try number " << (i+1) << std::endl;
-//         traj = getStraightTrajectory(endpoints, 100);
-//         auto ret = remonterGradient(traj, 0.0000001);
-//         if (optimalValue < ret.second) {
-//             optimalTraj = ret.first;
-//             optimalValue = ret.second;
-//         }
-//     }
-//     std::cout << optimalValue << std::endl;
-//     Train train;
-//     train.calculateMovement(optimalTraj);
-//     printForPython(train.getPositionDerivatives()[2]);
-//     printPoints(optimalTraj.points);
-//     printForPython(optimalTraj.points);
-//     return;
 // }
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height) {
@@ -372,13 +297,6 @@ void processInput(GLFWwindow *window) {
         glfwSetWindowShouldClose(window, true);
 }
 
-// int pow3(unsigned n) {
-//     unsigned p = 1;
-//     for (int i = 0; i < n; i++) {
-//         p *= 3;
-//     }
-//     return p;
-// }
 const float vertices[] = {
     -0.5f, -0.5f, 0.0f,
      0.5f, -0.5f, 0.0f,
@@ -443,10 +361,10 @@ unsigned int genShaderProgram() {
     return shaderProgram;
 }
 
-void draw(unsigned int& VAO, unsigned int& VBO, unsigned int& shaderProgram) {
+void draw(unsigned int& VAO, unsigned int& VBO, unsigned int& shaderProgram, unsigned int n) {
     glUseProgram(shaderProgram);
     glBindVertexArray(VAO);
-    glDrawArrays(GL_LINE_LOOP, 0, 3);
+    glDrawArrays(GL_LINE_STRIP, 0, n);
 }
 
 void setup(unsigned int& VAO, unsigned int& VBO, unsigned int& shaderProgram) {
@@ -464,53 +382,34 @@ void setup(unsigned int& VAO, unsigned int& VBO, unsigned int& shaderProgram) {
     glEnableVertexAttribArray(0);
 }
 
+void writeTrajectoryBuffer(unsigned int& VAO, unsigned int& VBO, Trajectory& optimalTraj) {
+    glBindVertexArray(VAO);
+    glBindBuffer(GL_ARRAY_BUFFER, VBO);
+
+    float traj[optimalTraj.points.size() * sizeof(float)];
+    for (unsigned int i = 0; i < optimalTraj.points.size(); i++) {
+        traj[3*i] = optimalTraj.points[i].x;
+        traj[3*i + 1] = optimalTraj.points[i].y;
+        traj[3*i + 2] = optimalTraj.points[i].z;
+    }
+
+    glBufferData(GL_ARRAY_BUFFER, sizeof(traj), traj, GL_DYNAMIC_DRAW);
+
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(0);
+}
+
 int main() {
     srand(time(NULL));
     file.open("data.csv");
-
-    findBestTrajectoryExact(1);
-
     file.close();
-
-    // int checked[59050];
-    // for (int i = 0; i <= 59049; i++) {
-    //     checked[i] = 0;
-    // }
-    // unsigned x = 0;
-    // for (int i = 0; i <= 59049; i++){
-    //     auto p = ternaryGrayDifference(i);
-    //     x += p.second * pow3(p.first);
-    //     checked[x] += 1;
-    //     //std::cout << p.first << " " << p.second << std::endl;
-    // }
-
-    // for (int i = 0; i < 59050; i++) {
-    //     std::cout << i << " " << checked[i] << std::endl;
-    // }
-    // Trajectory traj;
-    // for (int i = 0; i < 100; i++)
-    // {
-    //     traj.points.push_back({i/100.0, 0.0, 0.0});
-    // }
-    
-    // Vector3d endpoints[4] = {{-0.05, 0.0, 0.0}, {0.0, 0.0, 0.0}, {1.0, 0.0, 0.0}, {1.05, 0.0, 0.0}};
-    // Trajectory traj = getRandomTrajectory(endpoints, 10);
-    // Trajectory newTraj = getNearbyTrajectory(traj, 0.005);
-    
-    // Train train;
-    // train.calculateMovement(traj);
-    // auto pos = train.getPositionDerivatives();
-    // printPoints(pos[3]);
-    // std::cout << pos[0].size() << " " << pos[1].size() << " " << pos[2].size() << " " << pos[3].size() << std::endl;
-    // printTrajectory(traj);
-    // printTrajectory(newTraj);
 
     glfwInit();
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
-    GLFWwindow* window = glfwCreateWindow(800, 600, "LearnOpenGL", NULL, NULL);
+    GLFWwindow* window = glfwCreateWindow(1000, 1000, "LearnOpenGL", NULL, NULL);
     if (window == NULL)
     {
         std::cout << "Failed to create GLFW window" << std::endl;
@@ -525,26 +424,99 @@ int main() {
         return -1;
     }    
 
-    glViewport(0, 0, 800, 600);
+    glViewport(0, 0, 1000, 1000);
 
     glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
 
     glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
 
+    unsigned int VAO, VBO, shaderProgram;
+    setup(VAO, VBO, shaderProgram);
+
+////////// Train logic
+    Trajectory traj;
+    Trajectory optimalTraj;
+    double optimalValue = -INFINITY;
+    double s = 0.9;
+    Vector3d endpoints[6] = {{-1.0*s, -1.05*s, 0.0*s}, {-1.0*s, -1.0*s, 0.0*s}, {-1.0*s, -0.95*s, 0.0*s}, {1.0*s, 1.0*s, 0.0*s}, {1.0*s, 1.05*s, 0.0*s}, {1.0*s, 1.1*s, 0.0*s}};
+    traj = getStraightTrajectory(endpoints, N_POINTS);
+
+
+    Train train;
+    double step = 0.01;
+
+    train.calculateMovement(traj);
+    optimalValue = valueFunction(train.getPositionDerivatives());
+    optimalTraj = traj;
+
+    Trajectory tempTraj;
+    double tempValue = 0;
+
+    std::vector<std::vector<Vector3d>> positionDerivatives;
+    double tolerance = 0.000000000001;
+    bool valueImproved = true;
+///////////
+    auto start = std::chrono::steady_clock::now();
     while (!glfwWindowShouldClose(window))
     {
         processInput(window);
 
         glClear(GL_COLOR_BUFFER_BIT);
 
-        unsigned int VAO, VBO, shaderProgram;
-
-        setup(VAO, VBO, shaderProgram);
-        draw(VAO, VBO, shaderProgram);
-
+        auto now = std::chrono::steady_clock::now();
+        std::chrono::duration<double> delay = now - start;
+        if (step > tolerance) {
+            if (valueImproved) {
+                if (delay.count() > 0.125) {
+                    tempTraj = optimalTraj;
+                    slide(tempTraj, step);
+                    valueImproved = false;
+                    double values[POWER_OF_THREE];
+                    for (unsigned int i = 0; i < POWER_OF_THREE; i++) {
+                        //std::cout << tempTraj.points[tempTraj.points.size() - 3] << std::endl;
+                        getNextTrajectory(tempTraj, i, step);
+                        train.calculateMovement(tempTraj);
+                        tempValue = valueFunction(train.getPositionDerivatives());
+                        values[i] = tempValue;
+                        // std::cout << -tempValue << ", " << step << std::endl;
+                        
+                        if (tempValue < optimalValue - 0.0001 && (rand()%2) == 0) {
+                            optimalTraj = tempTraj;
+                            optimalValue = tempValue;
+                            valueImproved = true;
+                            std::cout << "Better value: " << optimalValue << std::endl;
+                            std::cout << "Step: " << step << std::endl;
+                        }
+                    }
+                    // std::sort(values, values + POWER_OF_THREE, std::greater<double>());
+                    // for (unsigned int i = 0; i < POWER_OF_THREE - 1; i++) {
+                    //     std::cout << values[i] << "\t\t";
+                    // }
+                    // std::cout << values[POWER_OF_THREE - 1] << "\n" << std::endl;
+                    //std::cout << valueImproved << std::endl;
+                    start = std::chrono::steady_clock::now();
+                }
+            }
+            else {
+                std::cout << "Best value at this step: " << optimalValue << std::endl;
+                std::cout << "Step: " << step << std::endl;
+                valueImproved = true;
+                step /= 2;
+            }
+            writeTrajectoryBuffer(VAO, VBO, optimalTraj);
+        }
+        draw(VAO, VBO, shaderProgram, optimalTraj.points.size());
+////////////////
         glfwSwapBuffers(window);
         glfwPollEvents();
     }
+
+    std::cout << "The best value: " << optimalValue << std::endl;
+    train.calculateMovement(optimalTraj);
+    //printForPython(train.getPositionDerivatives()[2]);
+    //printPoints(optimalTraj.points);
+    printPoints(train.getPositionDerivatives()[2]);
+    //printForPython(optimalTraj.points);
 
     glfwTerminate();
     return 0;

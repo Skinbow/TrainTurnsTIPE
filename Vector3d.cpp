@@ -9,6 +9,14 @@ Vector3d Vector3d::zero() {
     return Vector3d();
 }
 
+double Vector3d::dot(const Vector3d &a) {
+    return x * a.x + y * a.y + z * a.z;
+}
+
+Vector3d Vector3d::cross(const Vector3d &a) {
+    return Vector3d(y * a.z - z * a.y, z * a.x - x * a.z, x * a.y - y * a.x);
+}
+
 Vector3d Vector3d::operator+(const Vector3d &a) {
     return Vector3d(x + a.x, y + a.y, z + a.z);
 }
